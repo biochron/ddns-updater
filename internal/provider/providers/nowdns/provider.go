@@ -1,4 +1,4 @@
-package spdyn
+package nowdns
 
 import (
 	"context"
@@ -20,20 +20,17 @@ import (
 
 type Provider struct {
 	domain        string
-	host          string
 	ipVersion     ipversion.IPVersion
-	user          string
+	username      string
 	password      string
-	token         string
 	useProviderIP bool
 }
 
-func New(data json.RawMessage, domain, host string,
+func New(data json.RawMessage, domain string,
 	ipVersion ipversion.IPVersion) (p *Provider, err error) {
 	extraSettings := struct {
-		User          string `json:"user"`
+		Username      string `json:"username"`
 		Password      string `json:"password"`
-		Token         string `json:"token"`
 		UseProviderIP bool   `json:"provider_ip"`
 	}{}
 	err = json.Unmarshal(data, &extraSettings)
@@ -42,11 +39,9 @@ func New(data json.RawMessage, domain, host string,
 	}
 	p = &Provider{
 		domain:        domain,
-		host:          host,
 		ipVersion:     ipVersion,
-		user:          extraSettings.User,
+		username:      extraSettings.Username,
 		password:      extraSettings.Password,
-		token:         extraSettings.Token,
 		useProviderIP: extraSettings.UseProviderIP,
 	}
 	err = p.isValid()
@@ -57,22 +52,17 @@ func New(data json.RawMessage, domain, host string,
 }
 
 func (p *Provider) isValid() error {
-	if p.token != "" {
-		return nil
-	}
 	switch {
-	case p.user == "":
+	case p.username == "":
 		return fmt.Errorf("%w", errors.ErrUsernameNotSet)
 	case p.password == "":
 		return fmt.Errorf("%w", errors.ErrPasswordNotSet)
-	case p.host == "*":
-		return fmt.Errorf("%w", errors.ErrHostWildcard)
 	}
 	return nil
 }
 
 func (p *Provider) String() string {
-	return utils.ToString(p.domain, p.host, constants.Spdyn, p.ipVersion)
+	return utils.ToString(p.domain, "@", constants.NowDNS, p.ipVersion)
 }
 
 func (p *Provider) Domain() string {
@@ -80,7 +70,7 @@ func (p *Provider) Domain() string {
 }
 
 func (p *Provider) Host() string {
-	return p.host
+	return "@"
 }
 
 func (p *Provider) IPVersion() ipversion.IPVersion {
@@ -92,42 +82,32 @@ func (p *Provider) Proxied() bool {
 }
 
 func (p *Provider) BuildDomainName() string {
-	return utils.BuildDomainName(p.host, p.domain)
+	return p.domain
 }
 
 func (p *Provider) HTML() models.HTMLRow {
 	return models.HTMLRow{
 		Domain:    fmt.Sprintf("<a href=\"http://%s\">%s</a>", p.BuildDomainName(), p.BuildDomainName()),
 		Host:      p.Host(),
-		Provider:  "<a href=\"https://spdyn.com/\">Spdyn DNS</a>",
+		Provider:  "<a href=\"https://www.now-dns.com/\">Now-DNS</a>",
 		IPVersion: p.ipVersion.String(),
 	}
 }
 
 func (p *Provider) Update(ctx context.Context, client *http.Client, ip netip.Addr) (newIP netip.Addr, err error) {
-	// see https://wiki.securepoint.de/SPDyn/Variablen
 	u := url.URL{
 		Scheme: "https",
-		Host:   "update.spdyn.de",
-		Path:   "/nic/update",
+		Host:   "now-dns.com",
+		Path:   "/update",
+		User:   url.UserPassword(p.username, p.password),
 	}
-	hostname := utils.BuildURLQueryHostname(p.host, p.domain)
+
 	values := url.Values{}
-	values.Set("hostname", hostname)
-	if p.useProviderIP {
-		values.Set("myip", "10.0.0.1")
-	} else {
+	values.Set("hostname", p.domain)
+	if !p.useProviderIP {
 		values.Set("myip", ip.String())
 	}
-	if p.token != "" {
-		values.Set("user", hostname)
-		values.Set("pass", p.token)
-	} else {
-		values.Set("user", p.user)
-		values.Set("pass", p.password)
-	}
 	u.RawQuery = values.Encode()
-
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return netip.Addr{}, fmt.Errorf("creating http request: %w", err)
@@ -144,36 +124,42 @@ func (p *Provider) Update(ctx context.Context, client *http.Client, ip netip.Add
 	if err != nil {
 		return netip.Addr{}, fmt.Errorf("reading response body: %w", err)
 	}
-	bodyString := string(b)
+	s := string(b)
 
-	if response.StatusCode != http.StatusOK {
-		return netip.Addr{}, fmt.Errorf("%w: %d: %s",
-			errors.ErrHTTPStatusNotValid, response.StatusCode, utils.ToSingleLine(bodyString))
-	}
-
-	switch {
-	case isAny(bodyString, constants.Abuse, "numhost"):
-		return netip.Addr{}, fmt.Errorf("%w", errors.ErrBannedAbuse)
-	case isAny(bodyString, constants.Badauth, "!yours"):
-		return netip.Addr{}, fmt.Errorf("%w", errors.ErrAuth)
-	case strings.HasPrefix(bodyString, "good"):
-		return ip, nil
-	case bodyString == constants.Notfqdn:
-		return netip.Addr{}, fmt.Errorf("%w: not fqdn", errors.ErrBadRequest)
-	case strings.HasPrefix(bodyString, "nochg"):
-		return ip, nil
-	case isAny(bodyString, "nohost", "fatal"):
-		return netip.Addr{}, fmt.Errorf("%w", errors.ErrHostnameNotExists)
-	default:
-		return netip.Addr{}, fmt.Errorf("%w: %s", errors.ErrUnknownResponse, bodyString)
-	}
-}
-
-func isAny(s string, values ...string) (ok bool) {
-	for _, value := range values {
-		if s == value {
-			return true
+	switch response.StatusCode {
+	case http.StatusOK:
+		switch {
+		case strings.Contains(s, "good"):
+			newIP, err = netip.ParseAddr(ip.String())
+			if err != nil {
+				return netip.Addr{}, fmt.Errorf("%w: %w", errors.ErrIPReceivedMalformed, err)
+			} else if !p.useProviderIP && ip.Compare(newIP) != 0 {
+				return netip.Addr{}, fmt.Errorf("%w: sent ip %s to update but received %s",
+					errors.ErrIPReceivedMismatch, ip, newIP)
+			}
+			return ip, nil
+		case strings.Contains(s, "nochg"):
+			newIP, err = netip.ParseAddr(ip.String())
+			if err != nil {
+				return netip.Addr{}, fmt.Errorf("%w: in response %q", errors.ErrReceivedNoResult, s)
+			} else if !p.useProviderIP && ip.Compare(newIP) != 0 {
+				return netip.Addr{}, fmt.Errorf("%w: sent ip %s to update but received %s",
+					errors.ErrIPReceivedMismatch, ip, newIP)
+			}
+			return ip, nil
+		default:
+			return netip.Addr{}, fmt.Errorf("%w: %s", errors.ErrUnknownResponse, s)
 		}
+	case http.StatusBadRequest:
+		switch s {
+		case constants.Nohost:
+			return netip.Addr{}, fmt.Errorf("%w", errors.ErrHostnameNotExists)
+		case constants.Badauth:
+			return netip.Addr{}, fmt.Errorf("%w", errors.ErrAuth)
+		default:
+			return netip.Addr{}, fmt.Errorf("%w: %s", errors.ErrUnknownResponse, s)
+		}
+	default:
+		return netip.Addr{}, fmt.Errorf("%w: %d: %s", errors.ErrHTTPStatusNotValid, response.StatusCode, s)
 	}
-	return false
 }

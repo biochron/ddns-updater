@@ -54,6 +54,7 @@ Light container updating DNS A and/or AAAA records periodically for multiple DNS
   - GoDaddy
   - Google
   - He.net
+  - Hetzner
   - Infomaniak
   - INWX
   - Linode
@@ -62,6 +63,7 @@ Light container updating DNS A and/or AAAA records periodically for multiple DNS
   - Namecheap
   - Netcup
   - NoIP
+  - Now-DNS
   - Njalla
   - OpenDNS
   - OVH
@@ -191,6 +193,7 @@ Check the documentation for your DNS provider:
 - [Namecheap](https://github.com/qdm12/ddns-updater/blob/master/docs/namecheap.md)
 - [Netcup](https://github.com/qdm12/ddns-updater/blob/master/docs/netcup.md)
 - [NoIP](https://github.com/qdm12/ddns-updater/blob/master/docs/noip.md)
+- [Now-DNS](https://github.com/qdm12/ddns-updater/blob/master/docs/nowdns.md)
 - [Njalla](https://github.com/qdm12/ddns-updater/blob/master/docs/njalla.md)
 - [OpenDNS](https://github.com/qdm12/ddns-updater/blob/master/docs/opendns.md)
 - [OVH](https://github.com/qdm12/ddns-updater/blob/master/docs/ovh.md)
@@ -210,7 +213,7 @@ Note that:
 
 | Environment variable | Default | Description |
 | --- | --- | --- |
-| `CONFIG` | | One line JSON object containing the entire config (takes precendence over config.json file) if specified |
+| `CONFIG` | | One line JSON object containing the entire config (takes precedence over config.json file) if specified |
 | `PERIOD` | `5m` | Default period of IP address check, following [this format](https://golang.org/pkg/time/#ParseDuration) |
 | `IPV6_PREFIX` | `/128` | IPv6 prefix used to mask your public IPv6 address and your record IPv6 address. Ranges from `/0` to `/128` depending on your ISP. |
 | `PUBLICIP_FETCHERS` | `all` | Comma separated fetcher types to obtain the public IP address from `http` and `dns` |

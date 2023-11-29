@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"github.com/qdm12/ddns-updater/internal/models"
+	"github.com/qdm12/ddns-updater/internal/provider/constants"
 	"github.com/qdm12/ddns-updater/internal/provider/errors"
 	"github.com/qdm12/ddns-updater/internal/provider/headers"
 	"github.com/qdm12/ddns-updater/internal/provider/utils"
@@ -58,7 +59,7 @@ func (p *Provider) isValid() error {
 }
 
 func (p *Provider) String() string {
-	return fmt.Sprintf("[domain: %s | host: %s | provider: DynV6]", p.domain, p.host)
+	return utils.ToString(p.domain, p.host, constants.DynV6, p.ipVersion)
 }
 
 func (p *Provider) Domain() string {
@@ -106,12 +107,14 @@ func (p *Provider) Update(ctx context.Context, client *http.Client, ip netip.Add
 	values := url.Values{}
 	values.Set("token", p.token)
 	values.Set("zone", utils.BuildURLQueryHostname(p.host, p.domain))
-	if !p.useProviderIP {
-		if isIPv4 {
-			values.Set("ipv4", ip.String())
-		} else {
-			values.Set("ipv6", ip.String())
-		}
+	ipValue := ip.String()
+	if p.useProviderIP {
+		ipValue = "auto"
+	}
+	if isIPv4 {
+		values.Set("ipv4", ipValue)
+	} else {
+		values.Set("ipv6", ipValue)
 	}
 	u.RawQuery = values.Encode()
 
