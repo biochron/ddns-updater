@@ -16,7 +16,8 @@ const (
 	Ifconfig Provider = "ifconfig"
 	Ipify    Provider = "ipify"
 	Ipinfo   Provider = "ipinfo"
-	Noip     Provider = "noip"
+	Spdyn    Provider = "spdyn"
+	Ipleak   Provider = "ipleak"
 )
 
 func ListProviders() []Provider {
@@ -25,7 +26,8 @@ func ListProviders() []Provider {
 		Ifconfig,
 		Ipify,
 		Ipinfo,
-		Noip,
+		Spdyn,
+		Ipleak,
 	}
 }
 
@@ -40,7 +42,7 @@ func ListProvidersForVersion(version ipversion.IPVersion) (providers []Provider)
 }
 
 var (
-	ErrUnknownProvider   = errors.New("unknown provider")
+	ErrUnknownProvider   = errors.New("unknown public IP echo HTTP provider")
 	ErrProviderIPVersion = errors.New("provider does not support IP version")
 )
 
@@ -68,26 +70,32 @@ func (provider Provider) url(version ipversion.IPVersion) (url string, ok bool) 
 		switch provider { //nolint:exhaustive
 		case Ipify:
 			url = "https://api.ipify.org"
-		case Noip:
-			url = "http://ip1.dynupdate.no-ip.com"
+		case Ipleak:
+			url = "https://ipv4.ipleak.net/json"
 		}
 
 	case ipversion.IP6:
 		switch provider { //nolint:exhaustive
 		case Ipify:
 			url = "https://api6.ipify.org"
-		case Noip:
-			url = "http://ip1.dynupdate6.no-ip.com"
+		case Ipleak:
+			url = "https://ipv6.ipleak.net/json"
 		}
 
 	case ipversion.IP4or6:
-		switch provider { //nolint:exhaustive
+		switch provider {
+		case Ipify:
+			url = "https://api64.ipify.org"
 		case Google:
 			url = "https://domains.google.com/checkip"
 		case Ifconfig:
 			url = "https://ifconfig.io/ip"
 		case Ipinfo:
 			url = "https://ipinfo.io/ip"
+		case Spdyn:
+			url = "https://checkip.spdyn.de"
+		case Ipleak:
+			url = "https://ipleak.net/json"
 		}
 	}
 

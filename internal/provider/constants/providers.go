@@ -7,6 +7,7 @@ const (
 	Aliyun       models.Provider = "aliyun"
 	AllInkl      models.Provider = "allinkl"
 	Cloudflare   models.Provider = "cloudflare"
+	Custom       models.Provider = "custom"
 	Dd24         models.Provider = "dd24"
 	DdnssDe      models.Provider = "ddnss"
 	DeSEC        models.Provider = "desec"
@@ -24,11 +25,12 @@ const (
 	Gandi        models.Provider = "gandi"
 	GCP          models.Provider = "gcp"
 	GoDaddy      models.Provider = "godaddy"
-	Google       models.Provider = "google"
+	GoIP         models.Provider = "goip"
 	HE           models.Provider = "he"
 	Hetzner      models.Provider = "hetzner"
 	Infomaniak   models.Provider = "infomaniak"
 	INWX         models.Provider = "inwx"
+	Ionos        models.Provider = "ionos"
 	Linode       models.Provider = "linode"
 	LuaDNS       models.Provider = "luadns"
 	Namecheap    models.Provider = "namecheap"
@@ -70,11 +72,12 @@ func ProviderChoices() []models.Provider {
 		Gandi,
 		GCP,
 		GoDaddy,
-		Google,
+		GoIP,
 		HE,
 		Hetzner,
 		Infomaniak,
 		INWX,
+		Ionos,
 		Linode,
 		LuaDNS,
 		Namecheap,

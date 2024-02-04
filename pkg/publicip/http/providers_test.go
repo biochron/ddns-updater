@@ -19,15 +19,15 @@ func Test_ListProvidersForVersion(t *testing.T) {
 	}{
 		"ip4or6": {
 			version:   ipversion.IP4or6,
-			providers: []Provider{Google, Ifconfig, Ipinfo},
+			providers: []Provider{Google, Ifconfig, Ipify, Ipinfo, Spdyn, Ipleak},
 		},
 		"ip4": {
 			version:   ipversion.IP4,
-			providers: []Provider{Ipify, Noip},
+			providers: []Provider{Ipify, Ipleak},
 		},
 		"ip6": {
 			version:   ipversion.IP6,
-			providers: []Provider{Ipify, Noip},
+			providers: []Provider{Ipify, Ipleak},
 		},
 	}
 
@@ -65,7 +65,7 @@ func Test_ValidateProvider(t *testing.T) {
 		"unknown": {
 			provider: Provider("unknown"),
 			version:  ipversion.IP4,
-			err:      errors.New("unknown provider: unknown"),
+			err:      errors.New("unknown public IP echo HTTP provider: unknown"),
 		},
 	}
 

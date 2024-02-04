@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/netip"
 	"os"
 	"strings"
 
@@ -16,10 +17,11 @@ import (
 )
 
 type commonSettings struct {
-	Provider  string `json:"provider"`
-	Domain    string `json:"domain"`
-	Host      string `json:"host"`
-	IPVersion string `json:"ip_version"`
+	Provider   string       `json:"provider"`
+	Domain     string       `json:"domain"`
+	Host       string       `json:"host"`
+	IPVersion  string       `json:"ip_version"`
+	IPv6Suffix netip.Prefix `json:"ipv6_suffix,omitempty"`
 	// Retro values for warnings
 	IPMethod *string `json:"ip_method,omitempty"`
 	Delay    *uint64 `json:"delay,omitempty"`
@@ -117,9 +119,15 @@ func extractAllSettings(jsonBytes []byte) (
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w: %w", errUnmarshalRaw, err)
 	}
+	// TODO(v3): remove retro compatibility with IPV6_PREFIX
+	retroIPv6Suffix, err := getRetroIPv6Suffix()
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting retro-compatible global IPV6 suffix: %w", err)
+	}
 
 	for i, common := range config.CommonSettings {
-		newProvider, newWarnings, err := makeSettingsFromObject(common, rawConfig.Settings[i])
+		newProvider, newWarnings, err := makeSettingsFromObject(common, rawConfig.Settings[i],
+			retroIPv6Suffix)
 		warnings = append(warnings, newWarnings...)
 		if err != nil {
 			return nil, warnings, err
@@ -130,8 +138,17 @@ func extractAllSettings(jsonBytes []byte) (
 	return allProviders, warnings, nil
 }
 
-func makeSettingsFromObject(common commonSettings, rawSettings json.RawMessage) (
+var (
+	ErrProviderNoLongerSupported = errors.New("provider no longer supported")
+)
+
+func makeSettingsFromObject(common commonSettings, rawSettings json.RawMessage,
+	retroGlobalIPv6Suffix netip.Prefix) (
 	providers []provider.Provider, warnings []string, err error) {
+	if common.Provider == "google" {
+		return nil, nil, fmt.Errorf("%w: %s", ErrProviderNoLongerSupported, common.Provider)
+	}
+
 	providerName := models.Provider(common.Provider)
 	if providerName == constants.DuckDNS { // only hosts, no domain
 		if common.Domain != "" { // retro compatibility
@@ -157,10 +174,21 @@ func makeSettingsFromObject(common commonSettings, rawSettings json.RawMessage) 
 		return nil, nil, err
 	}
 
+	ipv6Suffix := common.IPv6Suffix
+	if !ipv6Suffix.IsValid() {
+		ipv6Suffix = retroGlobalIPv6Suffix
+	}
+
+	if ipVersion == ipversion.IP4 && ipv6Suffix.IsValid() {
+		warnings = append(warnings,
+			fmt.Sprintf("IPv6 suffix specified as %s but IP version is %s",
+				ipv6Suffix, ipVersion))
+	}
+
 	providers = make([]provider.Provider, len(hosts))
 	for i, host := range hosts {
 		providers[i], err = provider.New(providerName, rawSettings, common.Domain,
-			host, ipVersion)
+			host, ipVersion, ipv6Suffix)
 		if err != nil {
 			return nil, warnings, err
 		}
